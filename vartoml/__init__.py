@@ -1,29 +1,62 @@
-__version__ = "0.1.0-alpha"
+"""vartoml - Enable variables in a TOML file"""
+
+__version__ = '0.9.2'
+__author__ = 'Manfred Lotz <manfred.lotz@posteo.de>'
+# __all__ = []
 
 import toml
 import os
 import re
 
+from typing import List, Dict, Match, Any, MutableMapping
 
-RE_ENV_VAR = r"\$\{([a-zA-Z0-9_]+:[a-zA-Z0-9_]+)\}"
 
+"""
+According to the TOML specification (https://toml.io/en/v1.0.0-rc.1)
+
+- naming rules for sections (aka tables) are the same as for keys
+- keys may consist of ASCII letters, digits, underscores and dashes
+
+
+Example:
+
+database = "/var/db/mydb.db"
+home_dir = "/home/johndoe"
+db-port = 4711
+_a = "hey"
+-bla = "something"
+1ab = true
+
+"""
+RE_VAR = re.compile(r"""
+             [$][{]
+             (
+                [a-zA-Z0-9_-]+     # section name
+                ([:][a-zA-Z0-9_-]+)+     # variable name
+             )
+             [}]
+""", re.VERBOSE)
 
 class VarToml:
-    def __init__(self):
+    def __init__(self) -> None:
         self.decoder = toml.TomlDecoder()
 
     def load(self, *args, **kwargs):
         self.data = toml.load(*args, **kwargs)
-        self.process(self.data)
+        self._process(self.data)
 
     def loads(self, *args, **kwargs):
         self.data = toml.loads(*args, **kwargs)
-        self.process(self.data)
+        self._process(self.data)
 
-    def var_replace(self, x):
+    def _var_replace(self, x):
         toml_var = x.groups()[0]
-        (section, item) = toml_var.split(":")
-        return str(self.data[section][item])
+        lst = toml_var.split(':')
+        val = self.data[lst[0]]
+        for v in lst[1:]:
+            val = val[v]
+
+        return str(val)
 
     def get(self, *args):
         gotten = self.data
@@ -31,10 +64,10 @@ class VarToml:
             gotten = gotten[arg]
         return gotten
 
-    def show(self):
+    def dict(self):
         return self.data
 
-    def process(self, item):
+    def _process(self, item):
         iter_ = None
         if isinstance(item, dict):
             iter_ = item.items()
@@ -43,12 +76,12 @@ class VarToml:
 
         for i, val in iter_:
             if isinstance(val, (dict, list)):
-                self.process(val)
+                self._process(val)
             elif isinstance(val, str):
-                if re.search(RE_ENV_VAR, val):
-                    r = re.sub(RE_ENV_VAR, self.var_replace, val)
+                if re.search(RE_VAR, val):
+                    r = re.sub(RE_VAR, self._var_replace, val)
 
-                    # Try to first load the value from the environment variable
+                    # Try to first load the value from the variable contents
                     # (i.e. make what seems like a float a float, what seems like a
                     # boolean a bool and so on). If that fails, fail back to
                     # string.
