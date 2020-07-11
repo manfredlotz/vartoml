@@ -9,12 +9,16 @@ from the `envtoml` package which is at https://github.com/mrshu/envtoml .
 
 # Variable names in TOML file
 
-Variables are specified this way: `${section:variable}`. Deeper nested 
-variables are not supported.
+Variables are specified this way: `${section[:section]:variable}`, i.e. sections can be nested.
 
-# Example
+# Example usage
 
-```toml
+```python
+from vartoml import VarToml
+
+
+TOML ="""
+
 [default]
 
 basedir = "/myproject"
@@ -22,7 +26,38 @@ bindir = "${default:basedir}/bin"
 datadir = "${default:basedir}/data"
 
 
-[other.dirs]
+[other_dirs-sub]
 
 logdir = "${default:datadir}/logs"
+"""
+
+toml = VarToml()
+toml.loads(TOML)
+
+assert toml.get('other_dirs-sub', 'logdir') == '/myproject/data/logs'
 ```
+
+# API
+
+## VarToml.load(f, _dict=dict)
+
+    same like what the toml package offers
+
+## VarToml.loads(s, _dict=dict)
+
+    same like what the toml package offers
+
+## VarToml.get(v,... ) 
+
+    returns a specific value from the toml dictionary
+
+    Example: 
+    ```python
+    toml = VarToml()
+    toml.loads('some.toml')
+    val = toml.get('default', 'id' )
+    ```
+
+## VarToml.toml()
+
+  returns the dictionary of the parsed toml data
